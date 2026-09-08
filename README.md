@@ -56,6 +56,14 @@ This project is for technical research and educational purposes only. Do not use
 
 一个用于将任意文件切割、隐写/嵌入到 SVG 图片中，并能完美逆向提取还原的工具脚本。
 
+使用 `embed-jpg` 可将 JPG 图片转换为 Base64，并插入 SVG 的 `imageGrid` 组中：
+
+```bash
+./qrbak.sh embed-jpg ./1.jpg ./dev.svg ./dev-with-image.svg
+```
+
+该命令会在 `<g id="imageGrid">` 的结束标签前增加一行内嵌图片，不会修改原始 SVG。
+
 ### 💡 项目简介
 
 由于很多平台和环境对图片格式（如 `.svg`）的审查较弱或允许上传，本项目通过将任意敏感文件（如 `.bin`, `.zip`, `.txt`）**切片**并以不影响图片渲染的方式**嵌入到 SVG 文件的自定义标签或注释中**。同时，项目支持**逆向解析**，可将这些 SVG 文件中的数据重新拼装、还原为最原始的文件。

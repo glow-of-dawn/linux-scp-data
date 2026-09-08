@@ -13,9 +13,35 @@ usage() {
 用法:
   ./qrbak.sh encode <输入文件> <输出图片.png>
   ./qrbak.sh decode <输入图片.png> <输出文件>
+    ./qrbak.sh embed-jpg <输入图片.jpg> <输入SVG> <输出SVG>
 
 依赖: qrencode, zbarimg, ImageMagick (montage, convert, identify)
 EOF
+}
+
+embed_jpg() {
+        local image_path=$1 input_svg=$2 output_svg=$3 work_file payload
+
+        [[ -f $image_path ]] || { printf '错误: 找不到输入图片 %s\n' "$image_path" >&2; exit 1; }
+        [[ -f $input_svg ]] || { printf '错误: 找不到输入 SVG %s\n' "$input_svg" >&2; exit 1; }
+
+        payload=$(base64 -w 0 -- "$image_path")
+        [[ -n $payload ]] || { printf '错误: 输入图片为空，无法嵌入。\n' >&2; exit 1; }
+
+        work_file=$(mktemp)
+        trap 'rm -f -- "$work_file"' RETURN
+        awk -v image="    <image href=\"data:image/jpg;base64," payload "\"/>" '
+                /<g[[:space:]][^>]*id=["'"']imageGrid["'"'][^>]*>/ { in_grid = 1 }
+                in_grid && /<\/g>/ {
+                        print image
+                        in_grid = 0
+                }
+                { print }
+        ' "$input_svg" > "$work_file"
+
+        mv -- "$work_file" "$output_svg"
+        trap - RETURN
+        printf '已将 %s 嵌入 %s，输出至 %s\n' "$image_path" "$input_svg" "$output_svg"
 }
 
 require_commands() {
@@ -109,10 +135,56 @@ decode() {
     printf '已还原 %s 个数据块至: %s\n' "$expected_total" "$output_path"
 }
 
-[[ $# -eq 3 ]] || { usage >&2; exit 2; }
-require_commands
+[[ $# -ge 1 ]] || { usage >&2; exit 2; }
 case $1 in
-    encode) encode "$2" "$3" ;;
-    decode) decode "$2" "$3" ;;
+    encode|decode)
+        [[ $# -eq 3 ]] || { usage >&2; exit 2; }
+        require_commands
+        "$1" "$2" "$3"
+        ;;
+    embed-jpg)
+        [[ $# -eq 4 ]] || { usage >&2; exit 2; }
+        command -v base64 >/dev/null || { printf '错误: 未安装命令 base64\n' >&2; exit 1; }
+        embed_jpg "$2" "$3" "$4"
+        ;;
     *) usage >&2; exit 2 ;;
 esac
+
+
+
+base64 -w 0 ./1.jpg > /tmp/image.base64
+
+awk -v base64_file=/tmp/image.base64 '
+/<g id="imageGrid"/ {
+    in_grid = 1
+}
+
+in_grid && /<\/g>/ {
+    printf "        <image href=\"data:image/jpg;base64,"
+    while ((getline line < base64_file) > 0) {
+        printf "%s", line
+    }
+    close(base64_file)
+    print "\"/>"
+    in_grid = 0
+}
+
+{
+    print
+}
+' ./dev.svg > ./dev-new.svg
+
+rm -f /tmp/image.base64
+
+
+
+
+
+text=$(cat <<'EOF'
+<image href="data:image/jpg;base64,PLACEHOLDER"/>
+${HOME}
+$(date)
+EOF
+)
+
+printf '%s\n' "$text"
