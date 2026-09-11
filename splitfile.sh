@@ -2,8 +2,8 @@
 
 set -o pipefail
 
+SPLIT_SIZE=200k
 readonly SOURCE_PATH=./source
-readonly SPLIT_SIZE=3k
 readonly BASE64_PATH=./main-image.base64
 
 # svg 文件读取 / base64 插入 svg 文件
