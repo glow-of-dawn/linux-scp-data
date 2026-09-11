@@ -65,17 +65,35 @@ encode_svg_base64() {
         { print }
     ' "$SVG_PATH")
     [[ -n $svg_header ]] || { printf '错误: svg文件为空，无法嵌入。\n' >&2; exit 1; }
-    local svg_footer='</g></svg>'
-    local svg_content
+    local svg_body
 
     # base64 插入 svg 文件
-    local input_path="$SOURCE_PATH/image."
+    [[ -d "$SOURCE_PATH" ]] || {
+        printf '错误: 找不到目录 %s\n' "$SOURCE_PATH" >&2
+        exit 1
+    }
+    while IFS= read -r -d '' file; do
+        payload=$(<"$file")
+        svg_body+="        <image data href=\"data:image/jpg;base64,${payload}\"/>"$'\n'
+    done < <(
+    find "$SOURCE_PATH" \
+        -maxdepth 1 \
+        -type f \
+        -name 'image.*' \
+        -print0 |
+        sort -z
+    )
 
-
-    svg_content="${svg_header}<g id=\"imageGrid\">${svg_footer}"
-    printf '%s\n' "$svg_content"
-
-
+    local svg_content
+    local random_name
+    random_name=$(LC_ALL=C tr -dc 'A-Za-z' < /dev/urandom | head -c 5)
+    printf -v svg_content '%s\n%s\n%s%s\n%s' \
+        "${svg_header}" \
+        "    <g id=\"imageGrid\">" \
+        "${svg_body}" \
+        "    </g>" \
+        "</svg>"
+    printf '%s\n' "$svg_content" > "./$random_name.svg"
 }
 
 # ---------------------------------------------------------
@@ -108,7 +126,8 @@ case "$1" in
         printf '> svg处理\n'
         encode_svg_base64
         # 4. 临时文件清理
-        # rm -r "$SOURCE_PATH"
+        printf '> 清理临时文件\n'
+        rm -r "$SOURCE_PATH"
         ;;
     decode)
         printf '> svg还原\n'
