@@ -3,14 +3,11 @@
 set -o pipefail
 
 readonly SOURCE_PATH=./source
-readonly TARGET_PATH=./target
 readonly SPLIT_SIZE=3k
-readonly SVG_PATH=./dev.svg
 readonly BASE64_PATH=./main-image.base64
 
 # svg 文件读取 / base64 插入 svg 文件
 encode_svg_base64() {
-    [[ -f $SVG_PATH ]] || { printf '错误: 请提供初始化svg文件 %s\n' "$SVG_PATH" >&2; exit 1; }
     [[ -f $BASE64_PATH ]] || {
         printf '错误: 找不到 Base64 文件 %s\n' "$BASE64_PATH" >&2
         exit 1
@@ -39,7 +36,7 @@ EOF
     }
     while IFS= read -r -d '' file; do
         payload=$(<"$file")
-        svg_body+="        <image data href=\"data:image/jpg;base64,${payload}\"/>"$'\n'
+        svg_body+="        <image data=\"${file}\" href=\"data:image/jpg;base64,${payload}\"/>"$'\n'
     done < <(
     find "$SOURCE_PATH" \
         -maxdepth 1 \
@@ -61,11 +58,35 @@ EOF
     printf '%s\n' "$svg_content" > "./$random_name.svg"
 }
 
+# svg 文件读取 / base64 提取
+decode_svg_base64() {
+    # svg 文件读取
+    local input_svg=$1
+    [[ -f $input_svg ]] || {
+        printf '错误: 找不到 SVG 文件 %s\n' "$input_svg" >&2
+        return 1
+    }
+
+    awk '
+    {
+        marker = "data:image/jpg;base64,"
+        start = index($0, marker)
+
+        if (start > 0) {
+            payload = substr($0, start + length(marker))
+            sub(/"[[:space:]]*\/>[[:space:]]*$/, "", payload)
+            printf "%s", payload
+        }
+    }
+    ' "$input_svg" > "./output_base64"
+}
+
 # ---------------------------------------------------------
 # 主程序
 # ---------------------------------------------------------
 [[ $# -ge 2 ]] || {
-    printf '> 用法: %s <encode | decode> <文件>\n' "$0" >&2
+    printf '> 用法: %s <encode> <文件>\n' "$0" >&2
+    printf '> 用法: %s <decode> <svg文件> <output文件.扩展名>\n' "$0" >&2
     exit 2
 }
 
@@ -80,27 +101,39 @@ INPUT_FILE=$2
 case "$1" in
     encode)
         # 1. 临时目录生成
-        printf '> svg生成\n'
+        printf '> svg生成 -> '
         rm -rf "$SOURCE_PATH"
         mkdir -p "$SOURCE_PATH"
         # 2. base64转换 / split分割
-        printf '> split分割\n'
+        printf 'split分割 -> '
         base64 -w 0 "$INPUT_FILE" | 
             split -b "$SPLIT_SIZE" -d -a 3 - "$SOURCE_PATH/image."
         # 3. svg 文件读取 / base64 插入 svg 文件
-        printf '> svg处理\n'
+        printf 'svg处理 -> '
         encode_svg_base64
         # 4. 临时文件清理
-        printf '> 清理临时文件\n'
+        printf '清理临时文件\n'
         rm -r "$SOURCE_PATH"
         ;;
     decode)
-        printf '> svg还原\n'
+        [[ $# -eq 3 ]] || {
+            printf '用法: %s decode <svg文件> <输出文件>\n' "$0" >&2
+            exit 2
+        }
+        output_file=$3
+        printf '> svg还原 -> '
+        # 1. svg 文件读取 / base64 提取
+        printf 'svg处理 -> '
+        decode_svg_base64 "$2"
+        # 2. base64 解码
+        printf 'base64 解码 -> '
+        base64 -d "./output_base64" > "$output_file"
+        # 3. 临时文件清理
+        # printf '清理临时文件\n'
+        # rm "$SOURCE_PATH"
         ;;
     *)
         printf '未知操作类型 %s\n' "$1" >&2
         exit 2
         ;;
 esac
-
-# 新建目录

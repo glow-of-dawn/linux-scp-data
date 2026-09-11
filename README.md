@@ -105,3 +105,18 @@ python script.py decode --input-dir ./output_svgs --output ./restored_archive.zi
 ### ⚠️ 免责声明
 
 本项目仅用于技术研究与安全教育目的。请勿将此脚本用于任何违反法律法规、侵犯他人隐私或恶意规避平台审查的场景。作者对因使用本工具造成的任何后果不承担任何法律责任。
+
+### svg
+
+```bash
+<svg id="dev-image-svg" viewBox="0 0 1680 1050" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+    <rect width="100%" height="100%" fill="white"/>
+    <image href="data:image/jpg;base64,"/>
+    <g id="imageGrid">
+        <image href="./images/git/git-1.png"/>
+        <image href="./images/git/git-2.png"/>
+        <image href="./images/git/git-3.png"/>
+        <image href="./images/git/git-4.png"/>
+    </g>
+</svg>
+```
