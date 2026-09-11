@@ -6,65 +6,30 @@ readonly SOURCE_PATH=./source
 readonly TARGET_PATH=./target
 readonly SPLIT_SIZE=3k
 readonly SVG_PATH=./dev.svg
-
-# usage() {
-#     cat <<'EOF'
-# 用法:
-#   ./qrbak.sh encode <输入文件> <输出图片.png>
-#   ./qrbak.sh decode <输入图片.png> <输出文件>
-#     ./qrbak.sh embed-jpg <输入图片.jpg> <输入SVG> <输出SVG>
-
-# 依赖: qrencode, zbarimg, ImageMagick (montage, convert, identify)
-# EOF
-# }
-
-# embed_jpg() {
-#         local image_path=$1 input_svg=$2 output_svg=$3 work_file payload
-
-#         [[ -f $image_path ]] || { printf '错误: 找不到输入图片 %s\n' "$image_path" >&2; exit 1; }
-#         [[ -f $input_svg ]] || { printf '错误: 找不到输入 SVG %s\n' "$input_svg" >&2; exit 1; }
-
-#         payload=$(base64 -w 0 -- "$image_path")
-#         [[ -n $payload ]] || { printf '错误: 输入图片为空，无法嵌入。\n' >&2; exit 1; }
-
-#         work_file=$(mktemp)
-#         trap 'rm -f -- "$work_file"' RETURN
-#         awk -v image="    <image href=\"data:image/jpg;base64," payload "\"/>" '
-#                 /<g[[:space:]][^>]*id=["'"']imageGrid["'"'][^>]*>/ { in_grid = 1 }
-#                 in_grid && /<\/g>/ {
-#                         print image
-#                         in_grid = 0
-#                 }
-#                 { print }
-#         ' "$input_svg" > "$work_file"
-
-#         mv -- "$work_file" "$output_svg"
-#         trap - RETURN
-#         printf '已将 %s 嵌入 %s，输出至 %s\n' "$image_path" "$input_svg" "$output_svg"
-# }
-
-# require_commands() {
-#     local command_name
-#     for command_name in qrencode zbarimg montage convert identify; do
-#         command -v "$command_name" >/dev/null || {
-#             printf '错误: 未安装命令 %s\n' "$command_name" >&2
-#             exit 1
-#         }
-#     done
-# }
-
+readonly BASE64_PATH=./main-image.base64
 
 # svg 文件读取 / base64 插入 svg 文件
 encode_svg_base64() {
     [[ -f $SVG_PATH ]] || { printf '错误: 请提供初始化svg文件 %s\n' "$SVG_PATH" >&2; exit 1; }
-
+    [[ -f $BASE64_PATH ]] || {
+        printf '错误: 找不到 Base64 文件 %s\n' "$BASE64_PATH" >&2
+        exit 1
+    }
     # 读取 imageGrid 开始标签之前的 SVG 内容
+    local imagebase64
+    imagebase64=$(<"$BASE64_PATH")
+    [[ -n $imagebase64 ]] || {
+        printf '错误: Base64 文件为空\n' >&2
+        exit 1
+    }
+
     local svg_header
-    svg_header=$(awk '
-        /<g[[:space:]]+id="imageGrid">/ { exit }
-        { print }
-    ' "$SVG_PATH")
-    [[ -n $svg_header ]] || { printf '错误: svg文件为空，无法嵌入。\n' >&2; exit 1; }
+    svg_header=$(cat <<EOF
+<svg id="dev-image-svg" viewBox="0 0 1680 1050" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+    <rect width="100%" height="100%" fill="white"/>
+    <image href="data:image/jpg;base64,${imagebase64}"/>
+EOF
+)
     local svg_body
 
     # base64 插入 svg 文件
