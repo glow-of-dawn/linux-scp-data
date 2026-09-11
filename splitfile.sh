@@ -93,7 +93,7 @@ decode_svg_base64() {
 # 主程序
 # ---------------------------------------------------------
 [[ $# -ge 2 ]] || {
-    printf '> 用法: %s <encode> <文件>\n' "$0" >&2
+    printf '> 用法: %s <encode> <源文件> <split_size: 1K,2M,3k...>\n' "$0" >&2
     printf '> 用法: %s <decode> <svg文件> <output文件.扩展名>\n' "$0" >&2
     exit 2
 }
@@ -108,6 +108,9 @@ INPUT_FILE=$2
 
 case "$1" in
     encode)
+        [[ $# -eq 3 ]] || {
+            SPLIT_SIZE=$3
+        }
         # 1. 临时目录生成
         printf '> svg生成 -> '
         rm -rf "$SOURCE_PATH"
