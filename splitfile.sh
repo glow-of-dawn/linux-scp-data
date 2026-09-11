@@ -68,17 +68,25 @@ decode_svg_base64() {
     }
 
     awk '
-    {
+    /<image[[:space:]][^>]*data="/ {
         marker = "data:image/jpg;base64,"
         start = index($0, marker)
 
         if (start > 0) {
             payload = substr($0, start + length(marker))
-            sub(/"[[:space:]]*\/>[[:space:]]*$/, "", payload)
+            sub(/["[:space:]]*\/>[[:space:]]*$/, "", payload)
             printf "%s", payload
+            found = 1
         }
     }
-    ' "$input_svg" > "./output_base64"
+    END {
+        if (!found) exit 1
+    }
+    ' "$input_svg" > "./output_base64" || {
+        printf '错误: SVG 中未找到有效的数据分片
+' >&2
+        return 1
+    }
 }
 
 # ---------------------------------------------------------
@@ -124,13 +132,17 @@ case "$1" in
         printf '> svg还原 -> '
         # 1. svg 文件读取 / base64 提取
         printf 'svg处理 -> '
-        decode_svg_base64 "$2"
+        decode_svg_base64 "$2" || exit 1
         # 2. base64 解码
         printf 'base64 解码 -> '
-        base64 -d "./output_base64" > "$output_file"
+        base64 -d "./output_base64" > "$output_file" || {
+            printf '错误: Base64 解码失败' >&2
+            rm -f -- "$output_file"
+            exit 1
+        }
         # 3. 临时文件清理
-        # printf '清理临时文件\n'
-        # rm "$SOURCE_PATH"
+        printf '清理临时文件\n'
+        rm ./output_base64
         ;;
     *)
         printf '未知操作类型 %s\n' "$1" >&2
